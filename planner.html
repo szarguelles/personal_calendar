@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Planner</title>
+<style>
+:root{--bg:#eef1f6;--card:#fff;--tx:#14213d;--mu:#5d6985;--bd:#d5dbe8;--ac:#3a5ccc;--class:#5b6b8c;--study:#1f8a5b;--pr:#b87a00;--gala:#c23d7b;--dl:#d1362b}
+@media(prefers-color-scheme:dark){:root{--bg:#10151f;--card:#18202e;--tx:#e8ecf5;--mu:#93a0bc;--bd:#2b364b;--ac:#7f9bff;--class:#8c9bbd;--study:#4cc28b;--pr:#e6aa2e;--gala:#ee7db0;--dl:#ff7a6e}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:7px 9px;width:100%}
+button{cursor:pointer;border:1px solid var(--bd);background:var(--card);border-radius:6px;padding:7px 12px}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
+#auth{max-width:340px;margin:12vh auto;padding:24px;background:var(--card);border:1px solid var(--bd);border-radius:10px}
+#auth h1{margin:0 0 4px;font-size:24px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
+.err{color:var(--dl);min-height:20px;font-size:13px}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--bd);background:var(--card);flex-wrap:wrap;gap:8px}
+header h1{font-size:19px;margin:0}
+nav{display:flex;gap:4px;padding:10px 18px 0}
+nav button{border-radius:6px 6px 0 0;border-bottom:0}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{padding:14px 18px 40px;max-width:1100px;margin:auto}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.bar h2{margin:0;font-size:18px}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.dh{font-size:12px;color:var(--mu);text-align:center;padding:3px}
+.cell{min-height:92px;border:1px solid var(--bd);border-radius:6px;padding:3px;cursor:pointer;overflow:hidden}
+.cell.off{opacity:.45}.cell.today{border-color:var(--ac);border-width:2px}.cell.sel{background:color-mix(in srgb,var(--ac) 12%,var(--card))}
+.cell b{font-size:12px}
+.cell small{font-size:11px;color:var(--mu)}
+.chip{display:block;font-size:11px;line-height:1.25;padding:1px 4px;margin-top:2px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
+.chip.class,.dot.class{background:var(--class)}.chip.study,.dot.study{background:var(--study)}.chip.pr,.dot.pr{background:var(--pr)}.chip.gala,.dot.gala{background:var(--gala)}
+.chip.soft{background:transparent;color:var(--tx);border:1px dashed currentColor}
+.chip.soft.study{color:var(--study)}.chip.soft.pr{color:var(--pr)}.chip.soft.gala{color:var(--gala)}
+.chip.dl{font-weight:700;box-shadow:inset 3px 0 var(--dl)}
+.item{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bd)}
+.item:last-child{border-bottom:0}.item input[type=checkbox]{width:auto;margin-top:4px}
+.item.done span.t{text-decoration:line-through;opacity:.55}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}
+.mu{color:var(--mu);font-size:13px}
+.days{display:flex;gap:4px;flex-wrap:wrap}.days label{display:flex;gap:4px;align-items:center;margin:0;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:4px 8px}.days input{width:auto}
+h3{margin:14px 0 6px;font-size:15px}
+.lg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mu);margin-top:8px}
+@media(max-width:640px){.cell{min-height:64px}.chip{font-size:10px}main{padding:10px}}
+</style></head><body>
+
+<section id="auth">
+  <h1>My Planner</h1>
+  <div class="mu">Works offline. Your data stays on this device.</div>
+  <label for="un">Username</label><input id="un" autocomplete="username">
+  <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">
+  <div class="err" id="aerr"></div>
+  <div class="row"><button class="p" id="bin">Sign in</button><button id="bup">Create account</button></div>
+</section>
+
+<div id="app" hidden>
+<header><h1>My Planner</h1><div class="row" style="flex:none"><span id="who" class="mu"></span><button id="out">Sign out</button></div></header>
+<nav id="tabs"><button data-t="cal" class="on">Calendar</button><button data-t="todo">To-do</button><button data-t="add">Add deadline</button><button data-t="cls">Class schedule</button></nav>
+<main>
+
+<div class="panel" id="p-cal">
+  <div class="bar"><button id="prev" aria-label="Previous month">‹</button><h2 id="mt"></h2><div class="row" style="flex:none"><button id="tod">Today</button><button id="next" aria-label="Next month">›</button></div></div>
+  <div class="grid" id="grid"></div>
+  <div class="lg"><span><i class="dot class" style="display:inline-block"></i> Class</span><span><i class="dot study" style="display:inline-block"></i> Study</span><span><i class="dot pr" style="display:inline-block"></i> PR work</span><span><i class="dot gala" style="display:inline-block"></i> Gala</span><span>Dashed = soft deadline (3 days before)</span></div>
+  <h3 id="dt"></h3><div id="day"></div>
+</div>
+
+<div class="panel" id="p-todo" hidden><div class="bar"><h2>To-do list</h2></div><div id="todo"></div></div>
+
+<div class="panel" id="p-add" hidden>
+  <div class="bar"><h2>Add a deadline</h2></div>
+  <div class="row"><div><label for="tt">Title</label><input id="tt" placeholder="e.g. Circuits 2 midterm"></div>
+  <div><label for="ty">Type</label><select id="ty"><option value="study">Study</option><option value="pr">PR work</option><option value="gala">Gala</option></select></div>
+  <div><label for="td">Deadline / date</label><input id="td" type="date"></div></div>
+  <div id="sbox"><label for="ts">Subject</label><input id="ts" list="subs" placeholder="Pick from your classes or type one"><datalist id="subs"></datalist>
+  <label for="tp">Things you need to study (one per line)</label><textarea id="tp" rows="5" placeholder="Op-amp circuits&#10;Filters&#10;Past exam problems"></textarea></div>
+  <div class="err" id="terr"></div>
+  <button class="p" id="tadd">Add to calendar</button>
+  <h3>Your deadlines</h3><div id="tl"></div>
+</div>
+
+<div class="panel" id="p-cls" hidden>
+  <div class="bar"><h2>Class schedule</h2></div>
+  <div class="row"><div><label for="cs">Subject</label><input id="cs"></div><div><label for="cr">Room</label><input id="cr"></div>
+  <div><label for="c1">Start</label><input id="c1" type="time"></div><div><label for="c2">End</label><input id="c2" type="time"></div></div>
+  <label>Days</label><div class="days" id="cd"></div>
+  <div class="err" id="cerr"></div>
+  <button class="p" id="csave">Save class</button> <button id="ccancel" hidden>Cancel edit</button>
+  <h3>Your classes</h3><div id="cl"></div>
+  <h3>Study window</h3><div class="mu">Study sessions are placed in free time inside this window, around your classes.</div>
+  <div class="row"><div><label for="ws">From</label><input id="ws" type="time"></div><div><label for="we">Until</label><input id="we" type="time"></div><div><label for="du">Session length (min)</label><input id="du" type="number" min="15" step="15"></div></div>
+  <h3>Backup</h3><div class="row" style="justify-content:flex-start"><button id="exp" style="flex:none">Export data</button><label style="margin:0;flex:none"><input id="imp" type="file" accept=".json" hidden><span class="mu" style="border:1px solid var(--bd);border-radius:6px;padding:7px 12px;cursor:pointer;display:inline-block">Import data</span></label></div>
+</div>
+</main></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const tm=s=>{const[h,m]=s.split(':').map(Number);return h*60+m};
+const ft=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const uid=()=>Math.random().toString(36).slice(2,9);
+const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const SOFT={study:'finish a first pass of every topic',pr:'have a draft ready',gala:'confirm plans, budget, ride and outfit'};
+const TYPE={study:'Study',pr:'PR work',gala:'Gala'};
+const hash=s=>{let a=0xdeadbeef,b=0x41c6ce57;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=Math.imul(a^c,2654435761);b=Math.imul(b^c,1597334677)}a=Math.imul(a^a>>>16,2246822507)^Math.imul(b^b>>>13,3266489909);b=Math.imul(b^b>>>16,2246822507)^Math.imul(a^a>>>13,3266489909);return(4294967296*(2097151&b)+(a>>>0)).toString(36)};
+const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+const sv=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+let user,D,view=new Date(),sel=iso(new Date()),editC=null;
+const save=()=>sv('pl_data_'+user,D);
+
+/* ---------- sign in ---------- */
+function auth(up){
+  const n=$('#un').value.trim().toLowerCase(),p=$('#pw').value,U=ld('pl_users',{});
+  const err=m=>$('#aerr').textContent=m;
+  if(!n||!p)return err('Enter a username and password.');
+  if(up){if(U[n])return err('That username is taken.');U[n]=hash(n+p);sv('pl_users',U)}
+  else if(U[n]!==hash(n+p))return err('Wrong username or password.');
+  start(n);
+}
+function start(n){
+  user=n;localStorage.setItem('pl_session',n);
+  D=ld('pl_data_'+n,null)||{classes:[],tasks:[],done:{},set:{ws:'17:00',we:'21:00',dur:60}};
+  $('#auth').hidden=true;$('#app').hidden=false;$('#who').textContent=n;$('#pw').value='';
+  $('#ws').value=D.set.ws;$('#we').value=D.set.we;$('#du').value=D.set.dur;
+  render();
+}
+$('#bin').onclick=()=>auth(false);$('#bup').onclick=()=>auth(true);
+$('#pw').onkeydown=e=>{if(e.key==='Enter')auth(false)};
+$('#out').onclick=()=>{localStorage.removeItem('pl_session');location.reload()};
+
+/* ---------- planning ---------- */
+const taskById=id=>D.tasks.find(t=>t.id===id);
+function sessions(){
+  const occ={},out=[],today=pd(iso(new Date())),dur=+D.set.dur||60,ws=tm(D.set.ws),we=tm(D.set.we);
+  const busy=d=>D.classes.filter(c=>c.days.includes(d.getDay())).map(c=>[tm(c.start),tm(c.end)]).concat(occ[iso(d)]||[]).sort((a,b)=>a[0]-b[0]);
+  const slot=d=>{let c=ws;for(const[s,e]of busy(d)){if(e<=c)continue;if(s-c>=dur&&c+dur<=we)return c;c=Math.max(c,e)}return c+dur<=we?c:null};
+  const put=(t,d,topic)=>{for(let x=d;x<pd(t.deadline);x=addD(x,1)){if(x<today)continue;const c=slot(x);if(c!=null){(occ[iso(x)]??=[]).push([c,c+dur]);out.push({tid:t.id,date:iso(x),s:c,e:c+dur,topic});return}}};
+  D.tasks.filter(t=>t.type==='study'&&pd(t.deadline)>today).sort((a,b)=>a.deadline.localeCompare(b.deadline)).forEach(t=>{
+    const dl=pd(t.deadline);let last=addD(dl,-3);if(last<today)last=addD(dl,-1);
+    const days=[];for(let d=today;d<=last;d=addD(d,1))days.push(d);
+    const tp=t.topics.length?t.topics:['Study '+(t.subject||t.title)];
+    tp.forEach((x,i)=>put(t,days[Math.floor(i*days.length/tp.length)],x));
+    put(t,addD(dl,-1),'Final review: all topics');
+  });
+  return out;
+}
+function events(){
+  const E={},add=(d,e)=>(E[d]??=[]).push(e);
+  D.tasks.forEach(t=>{
+    add(t.deadline,{k:'dl',ty:t.type,t:(t.type==='gala'?'Gala: ':'Due: ')+t.title,key:t.id+'|dl',todo:1,time:-1});
+    add(iso(addD(pd(t.deadline),-3)),{k:'soft',ty:t.type,t:'Soft deadline: '+t.title+' ('+SOFT[t.type]+')',key:t.id+'|soft',todo:1,time:-1});
+  });
+  sessions().forEach(s=>{const t=taskById(s.tid);add(s.date,{k:'study',ty:'study',t:s.topic+' · '+(t.subject||t.title),key:s.tid+'|'+s.date+'|'+s.topic,todo:1,time:s.s,end:s.e})});
+  return E;
+}
+function items(k,E){
+  const w=pd(k).getDay();
+  const cl=D.classes.filter(c=>c.days.includes(w)).map(c=>({k:'class',ty:'class',t:c.subj+(c.room?' ('+c.room+')':''),time:tm(c.start),end:tm(c.end)}));
+  return cl.concat(E[k]||[]).sort((a,b)=>a.time-b.time);
+}
+
+/* ---------- render ---------- */
+const chip=e=>`<span class="chip ${e.k} ${e.ty}">${e.time>=0?ft(e.time)+' ':''}${esc(e.t)}</span>`;
+const row=(e,k)=>`<div class="item ${D.done[e.key]?'done':''}">${e.todo?`<input type="checkbox" class="ck" data-key="${esc(e.key)}" ${D.done[e.key]?'checked':''} aria-label="Done">`:`<i class="dot ${e.ty}"></i>`}<div><span class="t">${esc(e.t)}</span><div class="mu">${e.time>=0?ft(e.time)+'–'+ft(e.end)+' · ':''}${e.ty==='class'?'Class':TYPE[e.ty]}${k?' · '+pd(k).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):''}</div></div></div>`;
+function render(){
+  const E=events(),y=view.getFullYear(),m=view.getMonth(),first=new Date(y,m,1),st=addD(first,-first.getDay()),T=iso(new Date());
+  $('#mt').textContent=first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  let h=DN.map(d=>`<div class="dh">${d}</div>`).join('');
+  for(let i=0;i<42;i++){
+    const d=addD(st,i),k=iso(d),l=items(k,E);
+    h+=`<div class="cell${d.getMonth()!==m?' off':''}${k===T?' today':''}${k===sel?' sel':''}" data-d="${k}"><b>${d.getDate()}</b>${l.slice(0,3).map(chip).join('')}${l.length>3?`<small>+${l.length-3} more</small>`:''}</div>`;
+  }
+  $('#grid').innerHTML=h;
+  $('#dt').textContent=pd(sel).toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  const dl=items(sel,E);$('#day').innerHTML=dl.length?dl.map(e=>row(e)).join(''):'<div class="mu">Nothing scheduled. Add a deadline to fill your calendar.</div>';
+  // to-do
+  const ks=Object.keys(E).sort(),td=[];
+  ks.forEach(k=>E[k].filter(e=>e.todo&&(k>=T||(!D.done[e.key]&&e.k!=='study'))).sort((a,b)=>a.time-b.time).forEach(e=>td.push([k,e])));
+  $('#todo').innerHTML=td.length?td.map(([k,e])=>row(e,k)+(k<T?'<div class="mu" style="color:var(--dl);margin:-4px 0 4px 28px">Overdue</div>':'')).join(''):'<div class="mu">All clear. Add a deadline to get a to-do list.</div>';
+  // tasks list
+  $('#tl').innerHTML=D.tasks.length?[...D.tasks].sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(t=>`<div class="item"><i class="dot ${t.type}"></i><div style="flex:1"><span class="t">${esc(t.title)}</span><div class="mu">${TYPE[t.type]} · ${t.deadline}${t.topics.length?' · '+t.topics.length+' topics':''}</div></div><button data-del="${t.id}">Delete</button></div>`).join(''):'<div class="mu">No deadlines yet.</div>';
+  // classes
+  $('#cl').innerHTML=D.classes.length?D.classes.map(c=>`<div class="item"><i class="dot class"></i><div style="flex:1"><span class="t">${esc(c.subj)}</span><div class="mu">${c.days.map(d=>DN[d]).join(', ')} · ${c.start}–${c.end}${c.room?' · '+esc(c.room):''}</div></div><button data-ce="${c.id}">Edit</button> <button data-cd="${c.id}">Delete</button></div>`).join(''):'<div class="mu">No classes yet. Add your schedule so study sessions avoid class time.</div>';
+  $('#subs').innerHTML=[...new Set(D.classes.map(c=>c.subj))].map(s=>`<option value="${esc(s)}">`).join('');
+  $('#sbox').hidden=$('#ty').value!=='study';
+}
+
+/* ---------- events ---------- */
+$('#tabs').onclick=e=>{const t=e.target.dataset.t;if(!t)return;$$('#tabs button').forEach(b=>b.classList.toggle('on',b===e.target));['cal','todo','add','cls'].forEach(x=>$('#p-'+x).hidden=x!==t)};
+$('#prev').onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()-1,1);render()};
+$('#next').onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()+1,1);render()};
+$('#tod').onclick=()=>{view=new Date();sel=iso(view);render()};
+$('#grid').onclick=e=>{const c=e.target.closest('.cell');if(c){sel=c.dataset.d;render()}};
+document.addEventListener('change',e=>{if(e.target.classList.contains('ck')){D.done[e.target.dataset.key]=e.target.checked;save();render()}});
+$('#ty').onchange=render;
+$('#cd').innerHTML=DN.map((d,i)=>`<label><input type="checkbox" value="${i}">${d}</label>`).join('');
+
+$('#tadd').onclick=()=>{
+  const title=$('#tt').value.trim(),dl=$('#td').value,ty=$('#ty').value;
+  if(!title||!dl)return $('#terr').textContent='Add a title and a date.';
+  $('#terr').textContent='';
+  D.tasks.push({id:uid(),title,type:ty,deadline:dl,subject:ty==='study'?$('#ts').value.trim():'',topics:ty==='study'?$('#tp').value.split('\n').map(s=>s.trim()).filter(Boolean):[]});
+  save();['#tt','#td','#ts','#tp'].forEach(s=>$(s).value='');sel=dl;view=pd(dl);render();
+};
+$('#tl').onclick=e=>{const id=e.target.dataset.del;if(id){D.tasks=D.tasks.filter(t=>t.id!==id);save();render()}};
+
+function clearC(){editC=null;['#cs','#cr','#c1','#c2'].forEach(s=>$(s).value='');$$('#cd input').forEach(i=>i.checked=false);$('#ccancel').hidden=true;$('#csave').textContent='Save class'}
+$('#csave').onclick=()=>{
+  const c={id:editC||uid(),subj:$('#cs').value.trim(),room:$('#cr').value.trim(),start:$('#c1').value,end:$('#c2').value,days:$$('#cd input:checked').map(i=>+i.value)};
+  if(!c.subj||!c.start||!c.end||!c.days.length)return $('#cerr').textContent='Add a subject, start and end time, and at least one day.';
+  if(tm(c.end)<=tm(c.start))return $('#cerr').textContent='End time must be after start time.';
+  $('#cerr').textContent='';
+  D.classes=editC?D.classes.map(x=>x.id===editC?c:x):D.classes.concat(c);
+  save();clearC();render();
+};
+$('#ccancel').onclick=clearC;
+$('#cl').onclick=e=>{
+  const d=e.target.dataset.cd,ed=e.target.dataset.ce;
+  if(d){D.classes=D.classes.filter(c=>c.id!==d);save();render()}
+  if(ed){const c=D.classes.find(x=>x.id===ed);editC=ed;$('#cs').value=c.subj;$('#cr').value=c.room;$('#c1').value=c.start;$('#c2').value=c.end;$$('#cd input').forEach(i=>i.checked=c.days.includes(+i.value));$('#ccancel').hidden=false;$('#csave').textContent='Update class';$('#cs').focus()}
+};
+[['#ws','ws'],['#we','we'],['#du','dur']].forEach(([s,k])=>$(s).onchange=()=>{D.set[k]=$(s).value||D.set[k];save();render()});
+
+$('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D)],{type:'application/json'}));a.download='planner-backup-'+user+'.json';a.click()};
+$('#imp').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const o=JSON.parse(t);if(!o.tasks||!o.classes)throw 0;D=o;save();start(user)}catch{alert('That file is not a valid planner backup.')}})};
+
+const s=localStorage.getItem('pl_session');if(s&&ld('pl_users',{})[s])start(s);
+</script></body></html>
