@@ -78,6 +78,7 @@ h3{margin:14px 0 6px;font-size:15px}
   <div><label for="td">Deadline / date</label><input id="td" type="date"></div></div>
   <div id="sbox"><label for="ts">Subject</label><input id="ts" list="subs" placeholder="Pick from your classes or type one"><datalist id="subs"></datalist>
   <label for="tp">Things you need to study (one per line)</label><textarea id="tp" rows="5" placeholder="Op-amp circuits&#10;Filters&#10;Past exam problems"></textarea></div>
+  <div id="gbox" hidden><div class="row"><div><label for="g1">Gala start time</label><input id="g1" type="time"></div><div><label for="g2">Ends (optional)</label><input id="g2" type="time"></div><div><label for="gb">Get-ready buffer (min)</label><input id="gb" type="number" min="0" step="15" value="90"></div></div><div class="mu">Study sessions avoid this time and your buffer before it. If you skip the end time, the rest of that day is kept free.</div></div>
   <div class="err" id="terr"></div>
   <button class="p" id="tadd">Add to calendar</button>
   <h3>Your deadlines</h3><div id="tl"></div>
@@ -139,7 +140,7 @@ $('#out').onclick=()=>{localStorage.removeItem('pl_session');location.reload()};
 const taskById=id=>D.tasks.find(t=>t.id===id);
 function sessions(){
   const occ={},out=[],today=pd(iso(new Date())),dur=+D.set.dur||60,ws=tm(D.set.ws),we=tm(D.set.we);
-  const busy=d=>D.classes.filter(c=>c.days.includes(d.getDay())).map(c=>[tm(c.start),tm(c.end)]).concat(occ[iso(d)]||[]).sort((a,b)=>a[0]-b[0]);
+  const busy=d=>D.classes.filter(c=>c.days.includes(d.getDay())).map(c=>[tm(c.start),tm(c.end)]).concat(D.tasks.filter(t=>t.type==='gala'&&t.start&&t.deadline===iso(d)).map(t=>[Math.max(0,tm(t.start)-(+t.buf||0)),t.end&&tm(t.end)>tm(t.start)?tm(t.end):1440])).concat(occ[iso(d)]||[]).sort((a,b)=>a[0]-b[0]);
   const slot=d=>{let c=ws;for(const[s,e]of busy(d)){if(e<=c)continue;if(s-c>=dur&&c+dur<=we)return c;c=Math.max(c,e)}return c+dur<=we?c:null};
   const put=(t,d,topic)=>{for(let x=d;x<pd(t.deadline);x=addD(x,1)){if(x<today)continue;const c=slot(x);if(c!=null){(occ[iso(x)]??=[]).push([c,c+dur]);out.push({tid:t.id,date:iso(x),s:c,e:c+dur,topic});return}}};
   D.tasks.filter(t=>t.type==='study'&&pd(t.deadline)>today).sort((a,b)=>a.deadline.localeCompare(b.deadline)).forEach(t=>{
@@ -154,7 +155,9 @@ function sessions(){
 function events(){
   const E={},add=(d,e)=>(E[d]??=[]).push(e);
   D.tasks.forEach(t=>{
-    add(t.deadline,{k:'dl',ty:t.type,t:(t.type==='gala'?'Gala: ':'Due: ')+t.title,key:t.id+'|dl',todo:1,time:-1});
+    const g=t.type==='gala'&&t.start;
+    add(t.deadline,{k:'dl',ty:t.type,t:(t.type==='gala'?'Gala: ':'Due: ')+t.title,key:t.id+'|dl',todo:1,time:g?tm(t.start):-1,end:g&&t.end?tm(t.end):null});
+    if(g&&+t.buf)add(t.deadline,{k:'prep',ty:'gala',t:'Get ready and head out for '+t.title,key:t.id+'|prep',todo:1,time:Math.max(0,tm(t.start)-t.buf),end:tm(t.start)});
     add(iso(addD(pd(t.deadline),-3)),{k:'soft',ty:t.type,t:'Soft deadline: '+t.title+' ('+SOFT[t.type]+')',key:t.id+'|soft',todo:1,time:-1});
   });
   sessions().forEach(s=>{const t=taskById(s.tid);add(s.date,{k:'study',ty:'study',t:s.topic+' · '+(t.subject||t.title),key:s.tid+'|'+s.date+'|'+s.topic,todo:1,time:s.s,end:s.e})});
@@ -168,7 +171,7 @@ function items(k,E){
 
 /* ---------- render ---------- */
 const chip=e=>`<span class="chip ${e.k} ${e.ty}">${e.time>=0?ft(e.time)+' ':''}${esc(e.t)}</span>`;
-const row=(e,k)=>`<div class="item ${D.done[e.key]?'done':''}">${e.todo?`<input type="checkbox" class="ck" data-key="${esc(e.key)}" ${D.done[e.key]?'checked':''} aria-label="Done">`:`<i class="dot ${e.ty}"></i>`}<div><span class="t">${esc(e.t)}</span><div class="mu">${e.time>=0?ft(e.time)+'–'+ft(e.end)+' · ':''}${e.ty==='class'?'Class':TYPE[e.ty]}${k?' · '+pd(k).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):''}</div></div></div>`;
+const row=(e,k)=>`<div class="item ${D.done[e.key]?'done':''}">${e.todo?`<input type="checkbox" class="ck" data-key="${esc(e.key)}" ${D.done[e.key]?'checked':''} aria-label="Done">`:`<i class="dot ${e.ty}"></i>`}<div><span class="t">${esc(e.t)}</span><div class="mu">${e.time>=0?ft(e.time)+(e.end!=null?'–'+ft(e.end):'')+' · ':''}${e.ty==='class'?'Class':TYPE[e.ty]}${k?' · '+pd(k).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}):''}</div></div></div>`;
 function render(){
   const E=events(),y=view.getFullYear(),m=view.getMonth(),first=new Date(y,m,1),st=addD(first,-first.getDay()),T=iso(new Date());
   $('#mt').textContent=first.toLocaleDateString(undefined,{month:'long',year:'numeric'});
@@ -182,14 +185,14 @@ function render(){
   const dl=items(sel,E);$('#day').innerHTML=dl.length?dl.map(e=>row(e)).join(''):'<div class="mu">Nothing scheduled. Add a deadline to fill your calendar.</div>';
   // to-do
   const ks=Object.keys(E).sort(),td=[];
-  ks.forEach(k=>E[k].filter(e=>e.todo&&(k>=T||(!D.done[e.key]&&e.k!=='study'))).sort((a,b)=>a.time-b.time).forEach(e=>td.push([k,e])));
+  ks.forEach(k=>E[k].filter(e=>e.todo&&(k>=T||(!D.done[e.key]&&e.k!=='study'&&e.k!=='prep'))).sort((a,b)=>a.time-b.time).forEach(e=>td.push([k,e])));
   $('#todo').innerHTML=td.length?td.map(([k,e])=>row(e,k)+(k<T?'<div class="mu" style="color:var(--dl);margin:-4px 0 4px 28px">Overdue</div>':'')).join(''):'<div class="mu">All clear. Add a deadline to get a to-do list.</div>';
   // tasks list
-  $('#tl').innerHTML=D.tasks.length?[...D.tasks].sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(t=>`<div class="item"><i class="dot ${t.type}"></i><div style="flex:1"><span class="t">${esc(t.title)}</span><div class="mu">${TYPE[t.type]} · ${t.deadline}${t.topics.length?' · '+t.topics.length+' topics':''}</div></div><button data-del="${t.id}">Delete</button></div>`).join(''):'<div class="mu">No deadlines yet.</div>';
+  $('#tl').innerHTML=D.tasks.length?[...D.tasks].sort((a,b)=>a.deadline.localeCompare(b.deadline)).map(t=>`<div class="item"><i class="dot ${t.type}"></i><div style="flex:1"><span class="t">${esc(t.title)}</span><div class="mu">${TYPE[t.type]} · ${t.deadline}${t.start?' '+t.start+(t.end?'–'+t.end:''):''}${t.topics.length?' · '+t.topics.length+' topics':''}</div></div><button data-del="${t.id}">Delete</button></div>`).join(''):'<div class="mu">No deadlines yet.</div>';
   // classes
   $('#cl').innerHTML=D.classes.length?D.classes.map(c=>`<div class="item"><i class="dot class"></i><div style="flex:1"><span class="t">${esc(c.subj)}</span><div class="mu">${c.days.map(d=>DN[d]).join(', ')} · ${c.start}–${c.end}${c.room?' · '+esc(c.room):''}</div></div><button data-ce="${c.id}">Edit</button> <button data-cd="${c.id}">Delete</button></div>`).join(''):'<div class="mu">No classes yet. Add your schedule so study sessions avoid class time.</div>';
   $('#subs').innerHTML=[...new Set(D.classes.map(c=>c.subj))].map(s=>`<option value="${esc(s)}">`).join('');
-  $('#sbox').hidden=$('#ty').value!=='study';
+  $('#sbox').hidden=$('#ty').value!=='study';$('#gbox').hidden=$('#ty').value!=='gala';
 }
 
 /* ---------- events ---------- */
@@ -205,9 +208,12 @@ $('#cd').innerHTML=DN.map((d,i)=>`<label><input type="checkbox" value="${i}">${d
 $('#tadd').onclick=()=>{
   const title=$('#tt').value.trim(),dl=$('#td').value,ty=$('#ty').value;
   if(!title||!dl)return $('#terr').textContent='Add a title and a date.';
+  const g1=$('#g1').value,g2=$('#g2').value,gb=+$('#gb').value||0;
+  if(ty==='gala'&&!g1)return $('#terr').textContent='What time does the gala start?';
   $('#terr').textContent='';
-  D.tasks.push({id:uid(),title,type:ty,deadline:dl,subject:ty==='study'?$('#ts').value.trim():'',topics:ty==='study'?$('#tp').value.split('\n').map(s=>s.trim()).filter(Boolean):[]});
-  save();['#tt','#td','#ts','#tp'].forEach(s=>$(s).value='');sel=dl;view=pd(dl);render();
+  D.tasks.push({id:uid(),title,type:ty,deadline:dl,start:ty==='gala'?g1:'',end:ty==='gala'?g2:'',buf:ty==='gala'?gb:0,subject:ty==='study'?$('#ts').value.trim():'',topics:ty==='study'?$('#tp').value.split('\n').map(s=>s.trim()).filter(Boolean):[]});
+  save();['#tt','#td','#ts','#tp','#g1','#g2'].forEach(s=>$(s).value='');sel=dl;view=pd(dl);render();
+  if(ty==='gala'){const a=tm(g1)-gb,b=g2&&tm(g2)>tm(g1)?tm(g2):1440,w=pd(dl).getDay(),cf=D.classes.filter(c=>c.days.includes(w)&&tm(c.start)<b&&tm(c.end)>a).map(c=>c.subj);if(cf.length)$('#terr').textContent='Heads up: this overlaps your class: '+cf.join(', ')+'.'}
 };
 $('#tl').onclick=e=>{const id=e.target.dataset.del;if(id){D.tasks=D.tasks.filter(t=>t.id!==id);save();render()}};
 
